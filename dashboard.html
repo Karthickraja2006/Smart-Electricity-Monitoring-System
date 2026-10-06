@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your dashboard - SmartElectricity</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script>
+// Not logged in? Send them to the login page.
+if (!localStorage.getItem("userEmail")) { location.href = "login.html"; }
+</script>
+
+<nav>
+    <a class="logo" href="home.html">⚡ Smart<span>Electricity</span></a>
+    <div class="links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="profile.html">Profile</a>
+        <a href="contact.html">Contact</a>
+        <a href="#" onclick="logout()">Log out</a>
+    </div>
+</nav>
+
+<div class="page">
+
+    <h1 id="greeting">Hello</h1>
+    <p class="hint" id="summary">Loading your numbers...</p>
+
+    <div class="numbers">
+        <div class="number"><small>Used today</small><div class="big" id="usage">0 units</div></div>
+        <div class="number"><small id="costLabel">Cost so far today</small><div class="big" id="cost">₹0</div></div>
+        <div class="number"><small>Used this month</small><div class="big" id="monthlyUsage">0 units</div></div>
+    </div>
+
+    <div class="section">
+        <h2>Today against the daily guide</h2>
+        <div class="meter"><div id="barFill"></div></div>
+        <p id="status">Loading...</p>
+    </div>
+
+    <div class="section">
+        <h2>Log your usage</h2>
+        <p class="hint">Read your meter or smart plug and enter the units (kWh) used on a day.</p>
+        <form id="usageForm" class="row">
+            <input type="date" id="usageDate" aria-label="Date" required>
+            <input type="number" id="usageValue" min="0" step="0.1" placeholder="Units used, e.g. 9.5" aria-label="Units used" required>
+            <button type="submit">Save usage</button>
+        </form>
+        <div class="msg" id="usageMessage"></div>
+    </div>
+
+    <div class="section">
+        <h2>Your appliances</h2>
+        <p class="hint" id="applianceTip">Loading...</p>
+        <form id="applianceForm" class="row">
+            <input type="text" id="applianceName" placeholder="Appliance, e.g. Washing machine" aria-label="Appliance name" required>
+            <input type="number" id="applianceUsage" min="0" step="0.1" placeholder="Units per day" aria-label="Units per day" required>
+            <button type="submit">Add appliance</button>
+        </form>
+        <div class="msg" id="applianceMessage"></div>
+        <table>
+            <thead><tr><th>Appliance</th><th>Daily use</th><th>Verdict</th><th></th></tr></thead>
+            <tbody id="applianceTable"></tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Your history</h2>
+        <div class="scroll">
+            <table>
+                <thead><tr><th>Date</th><th>Units</th><th>Estimated cost</th></tr></thead>
+                <tbody id="historyTable"></tbody>
+            </table>
+        </div>
+        <p class="hint" id="historyEmpty" style="display:none;margin-top:14px">Nothing logged yet. Add your first reading above.</p>
+    </div>
+
+</div>
+
+<script>
+var email = localStorage.getItem("userEmail");
+var rate = 8;   // the backend sends the real rate with the dashboard numbers
+
+document.getElementById("usageDate").value = new Date().toISOString().slice(0, 10);
+
+// A greeting that changes with the time of day
+function setGreeting(name) {
+    var hour = new Date().getHours();
+    var word = "Good evening";
+    if (hour < 12) { word = "Good morning"; }
+    else if (hour < 17) { word = "Good afternoon"; }
+    document.getElementById("greeting").innerText = word + ", " + name;
+}
+setGreeting(localStorage.getItem("userName") || "there");
+
+// ---------- load the top numbers ----------
+async function loadDashboard() {
+    try {
+        var response = await fetch("/dashboard/" + encodeURIComponent(email));
+        var data = await response.json();
+        if (!response.ok) { throw new Error(data.message); }
+
+        rate = data.rate;
+        document.getElementById("usage").innerText = data.todayUsage + " units";
+        document.getElementById("cost").innerText = "₹" + data.cost;
+        document.getElementById("costLabel").innerText = "Cost so far today (₹" + data.rate + " a unit)";
+        document.getElementById("monthlyUsage").innerText = data.monthlyUsage + " units";
+        document.getElementById("barFill").style.width = data.percentage + "%";
+
+        var status = document.getElementById("status");
+        var summary = document.getElementById("summary");
+        var bar = document.getElementById("barFill");
+
+        if (data.todayUsage == 0) {
+            summary.innerText = "You haven't logged anything today. Add a reading below to see your numbers.";
+            status.innerText = "No usage logged for today yet.";
+            status.className = "";
+        } else if (data.todayUsage >= 12) {
+            summary.innerText = "You've used " + data.todayUsage + " units today, about ₹" + data.cost + ". That's on the high side.";
+            status.innerText = "You're at " + data.percentage + "% of the 12-unit daily guide. Try turning off anything you're not using.";
+            status.className = "bad";
+            bar.style.background = "#c4452f";
+        } else {
+            summary.innerText = "You've used " + data.todayUsage + " units today, about ₹" + data.cost + ". That's a comfortable day.";
+            status.innerText = "You're at " + data.percentage + "% of the 12-unit daily guide. Nicely done.";
+            status.className = "ok";
+            bar.style.background = "#2f8f5b";
+        }
+    } catch (error) {
+        document.getElementById("summary").innerText = "We couldn't load your numbers. Check that the server is running and refresh the page.";
+    }
+}
+
+async function loadProfileName() {
+    try {
+        var response = await fetch("/profile/" + encodeURIComponent(email));
+        var data = await response.json();
+        if (response.ok) {
+            localStorage.setItem("userName", data.name);
+            setGreeting(data.name);
+        }
+    } catch (error) { console.log(error); }
+}
+
+// ---------- appliances ----------
+async function loadAppliances() {
+    try {
+        var response = await fetch("/appliances/" + encodeURIComponent(email));
+        var list = await response.json();
+        var body = document.getElementById("applianceTable");
+        body.innerHTML = "";
+
+        if (list.length == 0) {
+            document.getElementById("applianceTip").innerText = "No appliances yet. Add the ones you use most, like a fan or a fridge.";
+            return;
+        }
+
+        // find the appliance that uses the most
+        var biggest = list[0];
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].usage > biggest.usage) { biggest = list[i]; }
+        }
+        document.getElementById("applianceTip").innerText =
+            "Your " + biggest.name + " uses the most (" + biggest.usage + " units a day). It's the best place to start saving.";
+
+        list.forEach(function (a) {
+            var row = document.createElement("tr");
+
+            var nameCell = document.createElement("td");
+            nameCell.textContent = a.name;
+            var usageCell = document.createElement("td");
+            usageCell.textContent = a.usage + " units";
+            var verdictCell = document.createElement("td");
+            verdictCell.textContent = a.usage >= 3 ? "Heavy user" : "Light user";
+
+            var actionCell = document.createElement("td");
+            var editBtn = document.createElement("button");
+            editBtn.className = "small ghost";
+            editBtn.textContent = "Edit";
+            editBtn.addEventListener("click", function () { editAppliance(a._id, a.name, a.usage); });
+
+            var removeBtn = document.createElement("button");
+            removeBtn.className = "small remove";
+            removeBtn.textContent = "Remove";
+            removeBtn.addEventListener("click", function () { deleteAppliance(a._id, a.name); });
+
+            actionCell.appendChild(editBtn);
+            actionCell.appendChild(removeBtn);
+            row.appendChild(nameCell);
+            row.appendChild(usageCell);
+            row.appendChild(verdictCell);
+            row.appendChild(actionCell);
+            body.appendChild(row);
+        });
+    } catch (error) { console.log(error); }
+}
+
+document.getElementById("applianceForm").addEventListener("submit", async function (event) {
+    event.preventDefault();
+    var msg = document.getElementById("applianceMessage");
+    var name = document.getElementById("applianceName").value.trim();
+
+    try {
+        var response = await fetch("/appliances", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                email: email,
+                name: name,
+                usage: Number(document.getElementById("applianceUsage").value)
+            })
+        });
+        if (response.ok) {
+            msg.className = "msg ok";
+            msg.innerText = "Added " + name + " to your list.";
+            event.target.reset();
+            loadAppliances();
+        } else {
+            msg.className = "msg bad";
+            msg.innerText = "Please enter a name and a usage of 0 or more.";
+        }
+    } catch (error) {
+        msg.className = "msg bad";
+        msg.innerText = "We couldn't reach the server. Please try again.";
+    }
+});
+
+async function editAppliance(id, oldName, oldUsage) {
+    var msg = document.getElementById("applianceMessage");
+    var newName = prompt("What is this appliance called?", oldName);
+    if (newName === null) { return; }
+    var newUsage = prompt("How many units does it use per day?", oldUsage);
+    if (newUsage === null) { return; }
+
+    try {
+        var response = await fetch("/appliances/" + id, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: newName.trim(), usage: Number(newUsage) })
+        });
+        if (response.ok) {
+            msg.className = "msg ok";
+            msg.innerText = "Saved your changes to " + newName.trim() + ".";
+            loadAppliances();
+        } else {
+            msg.className = "msg bad";
+            msg.innerText = "That change didn't save. Check the name and number and try again.";
+        }
+    } catch (error) {
+        msg.className = "msg bad";
+        msg.innerText = "We couldn't reach the server. Please try again.";
+    }
+}
+
+async function deleteAppliance(id, name) {
+    var msg = document.getElementById("applianceMessage");
+    if (!confirm("Remove " + name + " from your list?")) { return; }
+
+    try {
+        var response = await fetch("/appliances/" + id, { method: "DELETE" });
+        if (response.ok) {
+            msg.className = "msg ok";
+            msg.innerText = "Removed " + name + ".";
+            loadAppliances();
+        } else {
+            msg.className = "msg bad";
+            msg.innerText = "We couldn't remove it. Refresh the page and try again.";
+        }
+    } catch (error) {
+        msg.className = "msg bad";
+        msg.innerText = "We couldn't reach the server. Please try again.";
+    }
+}
+
+// ---------- usage history ----------
+async function loadHistory() {
+    try {
+        var response = await fetch("/usage/" + encodeURIComponent(email));
+        var list = await response.json();
+        var body = document.getElementById("historyTable");
+        body.innerHTML = "";
+        document.getElementById("historyEmpty").style.display = list.length == 0 ? "block" : "none";
+
+        list.forEach(function (x) {
+            var row = document.createElement("tr");
+            row.innerHTML = "<td>" + x.date + "</td><td>" + x.usage + " units</td><td>₹" + (x.usage * rate).toFixed(2) + "</td>";
+            body.appendChild(row);
+        });
+    } catch (error) { console.log(error); }
+}
+
+document.getElementById("usageForm").addEventListener("submit", async function (event) {
+    event.preventDefault();
+    var msg = document.getElementById("usageMessage");
+
+    try {
+        var response = await fetch("/usage", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                email: email,
+                date: document.getElementById("usageDate").value,
+                usage: Number(document.getElementById("usageValue").value)
+            })
+        });
+        if (response.ok) {
+            msg.className = "msg ok";
+            msg.innerText = "Saved. Your numbers are up to date.";
+            document.getElementById("usageValue").value = "";
+            await loadDashboard();
+            await loadHistory();
+        } else {
+            msg.className = "msg bad";
+            msg.innerText = "Please pick a date and enter a usage of 0 or more.";
+        }
+    } catch (error) {
+        msg.className = "msg bad";
+        msg.innerText = "We couldn't reach the server. Please try again.";
+    }
+});
+
+function logout() {
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("userName");
+    location.href = "login.html";
+}
+
+// run everything when the page opens (dashboard first, so we know the rate)
+loadProfileName();
+loadDashboard().then(loadHistory);
+loadAppliances();
+</script>
+</body>
+</html>

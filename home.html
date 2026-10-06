@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartElectricity - know your home's power use</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+    <a class="logo" href="home.html">⚡ Smart<span>Electricity</span></a>
+    <div class="links" id="navLinks">
+        <a href="login.html">Log in</a>
+        <a href="register.html">Sign up</a>
+        <a href="about.html">About</a>
+        <a href="contact.html">Contact</a>
+    </div>
+</nav>
+
+<section class="hero">
+    <div>
+        <h1>Know what your home is using before the bill arrives.</h1>
+        <p>Log your daily units, see what each appliance really costs you, and spot the habits that push your bill up.</p>
+        <a class="btn" id="startBtn" href="register.html">Create a free account</a>
+        <a class="btn ghost" href="about.html">How it works</a>
+    </div>
+
+    <div class="box today">
+        <h3 id="todayTitle">A sample day</h3>
+        <div class="big" id="usageValue">8.5 units</div>
+        <div class="meter"><div id="progressBar" style="width:71%"></div></div>
+        <p id="statusText" class="ok">That's a comfortable day.</p>
+    </div>
+</section>
+
+<section class="band">
+    <h2>What you can do here</h2>
+    <div class="three">
+        <div>
+            <h3>Log a day in seconds</h3>
+            <p>Type in the units you used and the date. That's it. Your monthly total adds itself up.</p>
+        </div>
+        <div>
+            <h3>See rupees, not just units</h3>
+            <p>Every reading is turned into an estimated cost, so you know what a hot afternoon really costs.</p>
+        </div>
+        <div>
+            <h3>Find the heavy hitters</h3>
+            <p>List your appliances and see which ones use the most, so you know where to cut back first.</p>
+        </div>
+    </div>
+</section>
+
+<footer>SmartElectricity. Made for households that want smaller bills.</footer>
+
+<script>
+// If the person is already logged in, show their real numbers
+// and change the buttons so they can go straight to the dashboard.
+var email = localStorage.getItem("userEmail");
+
+if (email) {
+    document.getElementById("navLinks").innerHTML =
+        '<a href="dashboard.html">Dashboard</a><a href="profile.html">Profile</a>' +
+        '<a href="about.html">About</a><a href="contact.html">Contact</a>';
+    document.getElementById("startBtn").innerText = "Go to my dashboard";
+    document.getElementById("startBtn").href = "dashboard.html";
+    loadToday();
+}
+
+async function loadToday() {
+    try {
+        var response = await fetch("/dashboard/" + encodeURIComponent(email));
+        var data = await response.json();
+        if (!response.ok) { return; }   // keep the sample card if something is wrong
+
+        document.getElementById("todayTitle").innerText = "Your day so far";
+        document.getElementById("usageValue").innerText = data.todayUsage + " units";
+        document.getElementById("progressBar").style.width = data.percentage + "%";
+
+        var status = document.getElementById("statusText");
+        if (data.todayUsage >= 12) {
+            status.innerText = "That's on the high side today.";
+            status.className = "bad";
+            document.getElementById("progressBar").style.background = "#c4452f";
+        } else if (data.todayUsage == 0) {
+            status.innerText = "Nothing logged yet. Add today's reading on your dashboard.";
+            status.className = "";
+        } else {
+            status.innerText = "That's a comfortable day.";
+            status.className = "ok";
+        }
+    } catch (error) {
+        console.log(error);   // server is off, so the sample card stays
+    }
+}
+</script>
+</body>
+</html>

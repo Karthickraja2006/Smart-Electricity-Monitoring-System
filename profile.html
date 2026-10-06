@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your profile - SmartElectricity</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script>
+if (!localStorage.getItem("userEmail")) { location.href = "login.html"; }
+</script>
+
+<nav>
+    <a class="logo" href="home.html">⚡ Smart<span>Electricity</span></a>
+    <div class="links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="profile.html">Profile</a>
+        <a href="contact.html">Contact</a>
+        <a href="#" onclick="logout()">Log out</a>
+    </div>
+</nav>
+
+<div class="page narrow">
+    <div class="box">
+        <div class="avatar" id="avatar">?</div>
+        <h1 style="text-align:center">Your profile</h1>
+        <p class="hint" style="text-align:center">Keep your details up to date.</p>
+
+        <form id="profileForm">
+            <label for="name">Your name</label>
+            <input id="name" required>
+
+            <label for="email">Email</label>
+            <input type="email" id="email" readonly>
+            <p class="hint" style="margin-top:-8px">Your email is how you log in, so it can't be changed here.</p>
+
+            <label for="phone">Phone number</label>
+            <input id="phone" required>
+
+            <button class="full" type="submit">Save changes</button>
+        </form>
+
+        <div class="msg" id="message"></div>
+    </div>
+</div>
+
+<script>
+var userEmail = localStorage.getItem("userEmail");
+var message = document.getElementById("message");
+
+async function loadProfile() {
+    try {
+        var response = await fetch("/profile/" + encodeURIComponent(userEmail));
+        var data = await response.json();
+        if (!response.ok) { throw new Error(data.message); }
+
+        document.getElementById("name").value = data.name;
+        document.getElementById("email").value = data.email;
+        document.getElementById("phone").value = data.phone;
+        document.getElementById("avatar").innerText = data.name.charAt(0).toUpperCase();
+    } catch (error) {
+        message.className = "msg bad";
+        message.innerText = "We couldn't load your profile. Check that the server is running and refresh the page.";
+    }
+}
+
+document.getElementById("profileForm").addEventListener("submit", async function (event) {
+    event.preventDefault();
+    var newName = document.getElementById("name").value.trim();
+
+    try {
+        var response = await fetch("/profile/" + encodeURIComponent(userEmail), {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name: newName,
+                phone: document.getElementById("phone").value.trim()
+            })
+        });
+
+        if (response.ok) {
+            localStorage.setItem("userName", newName);
+            document.getElementById("avatar").innerText = newName.charAt(0).toUpperCase();
+            message.className = "msg ok";
+            message.innerText = "Saved. Your details are up to date.";
+        } else {
+            message.className = "msg bad";
+            message.innerText = "Please fill in both your name and phone number.";
+        }
+    } catch (error) {
+        message.className = "msg bad";
+        message.innerText = "We couldn't reach the server. Please try again.";
+    }
+});
+
+function logout() {
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("userName");
+    location.href = "login.html";
+}
+
+loadProfile();
+</script>
+</body>
+</html>

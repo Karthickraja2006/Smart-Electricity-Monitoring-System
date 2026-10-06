@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log in - SmartElectricity</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+    <a class="logo" href="home.html">⚡ Smart<span>Electricity</span></a>
+    <div class="links">
+        <a href="home.html">Home</a>
+        <a href="register.html">Sign up</a>
+    </div>
+</nav>
+
+<div class="page narrow">
+    <div class="box">
+        <h1>Welcome back</h1>
+        <p class="hint">Log in to see how today is going.</p>
+
+        <form id="loginForm">
+            <label for="email">Email</label>
+            <input type="email" id="email" required>
+
+            <label for="password">Password</label>
+            <input type="password" id="password" required>
+
+            <button class="full" type="submit">Log in</button>
+        </form>
+
+        <div class="msg" id="message"></div>
+        <p class="switch">New here? <a href="register.html">Create an account</a></p>
+    </div>
+</div>
+
+<script>
+var form = document.getElementById("loginForm");
+var message = document.getElementById("message");
+
+form.addEventListener("submit", async function (event) {
+    event.preventDefault();
+    message.className = "msg";
+    message.innerText = "Checking your details...";
+
+    try {
+        var response = await fetch("/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                email: document.getElementById("email").value.trim(),
+                password: document.getElementById("password").value
+            })
+        });
+        var data = await response.json();
+
+        if (response.ok) {
+            // Remember who is logged in (the backend sends the name back)
+            localStorage.setItem("userEmail", data.user.email);
+            localStorage.setItem("userName", data.user.name);
+            message.className = "msg ok";
+            message.innerText = "Welcome back, " + data.user.name + "! Opening your dashboard...";
+            setTimeout(function () { location.href = "dashboard.html"; }, 700);
+        } else if (response.status == 401) {
+            message.className = "msg bad";
+            message.innerText = "That email and password don't match. Check for typos, or create an account if you're new.";
+        } else {
+            message.className = "msg bad";
+            message.innerText = "Please fill in both your email and password.";
+        }
+    } catch (error) {
+        message.className = "msg bad";
+        message.innerText = "We couldn't reach the server. Make sure it is running (npm start in the backend folder), then try again.";
+    }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact - SmartElectricity</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+    <a class="logo" href="home.html">⚡ Smart<span>Electricity</span></a>
+    <div class="links">
+        <a href="home.html">Home</a>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="about.html">About</a>
+        <a href="contact.html">Contact</a>
+    </div>
+</nav>
+
+<div class="page narrow" style="max-width:600px">
+    <div class="box">
+        <h1>Tell us what's on your mind</h1>
+        <p class="hint">A question, a bug, or an idea to make this better. Write it below.</p>
+
+        <form id="contactForm">
+            <label for="name">Your name</label>
+            <input id="name" required>
+
+            <label for="email">Your email</label>
+            <input type="email" id="email" required>
+
+            <label for="subject">What is it about?</label>
+            <input id="subject" required>
+
+            <label for="messageText">Your message</label>
+            <textarea id="messageText" required></textarea>
+
+            <button class="full" type="submit">Send message</button>
+        </form>
+
+        <div class="msg" id="message"></div>
+
+        <p class="hint" style="margin-top:24px">You can also reach us at support@smartelectricity.com or +91 98765 43210. We're based in Chennai, India.</p>
+    </div>
+</div>
+
+<script>
+var message = document.getElementById("message");
+
+// If they're logged in, fill in their details so they don't have to type them
+if (localStorage.getItem("userName")) { document.getElementById("name").value = localStorage.getItem("userName"); }
+if (localStorage.getItem("userEmail")) { document.getElementById("email").value = localStorage.getItem("userEmail"); }
+
+document.getElementById("contactForm").addEventListener("submit", async function (event) {
+    event.preventDefault();
+
+    try {
+        var response = await fetch("/contact", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name: document.getElementById("name").value.trim(),
+                email: document.getElementById("email").value.trim(),
+                subject: document.getElementById("subject").value.trim(),
+                message: document.getElementById("messageText").value.trim()
+            })
+        });
+
+        if (response.ok) {
+            message.className = "msg ok";
+            message.innerText = "Thanks! Your message has been sent.";
+            document.getElementById("subject").value = "";
+            document.getElementById("messageText").value = "";
+        } else {
+            message.className = "msg bad";
+            message.innerText = "Please fill in every box before sending.";
+        }
+    } catch (error) {
+        message.className = "msg bad";
+        message.innerText = "We couldn't reach the server. Please try again in a moment.";
+    }
+});
+</script>
+</body>
+</html>

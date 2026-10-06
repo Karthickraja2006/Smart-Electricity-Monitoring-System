@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign up - SmartElectricity</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+    <a class="logo" href="home.html">⚡ Smart<span>Electricity</span></a>
+    <div class="links">
+        <a href="home.html">Home</a>
+        <a href="login.html">Log in</a>
+    </div>
+</nav>
+
+<div class="page narrow">
+    <div class="box">
+        <h1>Create your account</h1>
+        <p class="hint">It takes under a minute. We'll add a few sample appliances so your dashboard isn't empty. You can change them anytime.</p>
+
+        <form id="registerForm">
+            <label for="name">Your name</label>
+            <input id="name" required>
+
+            <label for="email">Email</label>
+            <input type="email" id="email" required>
+
+            <label for="phone">Phone number</label>
+            <input type="tel" id="phone" required>
+
+            <label for="password">Password</label>
+            <input type="password" id="password" required>
+
+            <label for="confirmPassword">Type the password again</label>
+            <input type="password" id="confirmPassword" required>
+
+            <button class="full" type="submit">Create account</button>
+        </form>
+
+        <div class="msg" id="message"></div>
+        <p class="switch">Already have an account? <a href="login.html">Log in</a></p>
+    </div>
+</div>
+
+<script>
+var form = document.getElementById("registerForm");
+var message = document.getElementById("message");
+
+form.addEventListener("submit", async function (event) {
+    event.preventDefault();
+
+    var password = document.getElementById("password").value;
+    var confirmPassword = document.getElementById("confirmPassword").value;
+
+    if (password !== confirmPassword) {
+        message.className = "msg bad";
+        message.innerText = "Those two passwords don't match. Retype them and try again.";
+        return;
+    }
+
+    message.className = "msg";
+    message.innerText = "Creating your account...";
+
+    try {
+        var response = await fetch("/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name: document.getElementById("name").value.trim(),
+                email: document.getElementById("email").value.trim(),
+                phone: document.getElementById("phone").value.trim(),
+                password: password
+            })
+        });
+        var data = await response.json();
+
+        if (response.ok) {
+            form.reset();
+            message.className = "msg ok";
+            message.innerText = "You're in! Your account is ready. Taking you to the log in page...";
+            setTimeout(function () { location.href = "login.html"; }, 1200);
+        } else if (response.status == 409) {
+            message.className = "msg bad";
+            message.innerText = "That email already has an account. Try logging in instead.";
+        } else {
+            message.className = "msg bad";
+            message.innerText = "Please fill in every box so we can set you up.";
+        }
+    } catch (error) {
+        message.className = "msg bad";
+        message.innerText = "We couldn't reach the server. Make sure it is running (npm start in the backend folder), then try again.";
+    }
+});
+</script>
+</body>
+</html>
